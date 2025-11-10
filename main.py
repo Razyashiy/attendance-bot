@@ -4,18 +4,15 @@ import sys
 from datetime import datetime
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 import uvicorn
 import os
 
-# Импортируем ТОЛЬКО ПОСЛЕ создания app
+# Импортируем после app
 from webhook_server import webhook_server
 from logging_config import logger
 
-# Создаём приложение ПЕРВЫМ
-app = FastAPI(title="SYSTEMA CONTROLA POSESHCHAEMOSTI")
-
-# УБРАЛИ ВСЁ ПРО СТАТИКУ И ШАБЛОНЫ — НЕ НУЖНО!
+app = FastAPI(title="СИСТЕМА КОНТРОЛЯ ПОСЕЩАЕМОСТИ")
 
 class AttendanceSystem:
     def __init__(self):
@@ -24,10 +21,9 @@ class AttendanceSystem:
 
     async def start(self):
         if self.is_running:
-            logger.warning("System already running")
             return
         self.is_running = True
-        logger.info("Starting Attendance System...")
+        logger.info("Starting system...")
 
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, self._signal_handler)
@@ -49,7 +45,7 @@ class AttendanceSystem:
         await webhook_server.stop()
         logger.info("Shutdown complete")
 
-# РОУТЫ — ВСЁ ЧЕРЕЗ HTMLResponse, БЕЗ ШАБЛОНОВ
+# ГЛАВНАЯ СТРАНИЦА — КРАСИВАЯ, ЗЕЛЁНАЯ, БЕЗ static
 @app.get("/")
 async def root():
     return HTMLResponse("""
@@ -58,9 +54,11 @@ async def root():
             <title>СИСТЕМА КОНТРОЛЯ ПОСЕЩАЕМОСТИ</title>
             <meta charset="utf-8">
             <style>
-                body {font-family: Arial; text-align: center; margin-top: 10%; background: #0f0f0f; color: #0f0; }
-                h1 {font-size: 3em; text-shadow: 0 0 10px #0f0;}
-                a {color: #0f0; font-size: 1.5em;}
+                body {font-family: Arial; text-align: center; margin-top: 10%; background: #000; color: #0f0;}
+                h1 {font-size: 3.5em; text-shadow: 0 0 20px #0f0;}
+                h2 {font-size: 2em; color: #0f8;}
+                a {color: #0f0; font-size: 1.5em; text-decoration: none;}
+                a:hover {text-shadow: 0 0 10px #0f0;}
             </style>
         </head>
         <body>
@@ -80,37 +78,26 @@ async def health():
 async def telegram_webhook(request: Request):
     try:
         update = await request.json()
-        text = update.get("message", {}).get("text", "no text")
-        logger.info(f"Сообщение: {text}")
+        logger.info(f"Update: {update.get('message', {}).get('text', 'no text')}")
     except:
         logger.error("Bad update")
     return JSONResponse({"ok": True})
 
-# ЗАПУСК
 async def main():
     system = AttendanceSystem()
-    
-    print("=" * 60)
+    print("="*60)
     print("   СИСТЕМА КОНТРОЛЯ ПОСЕЩАЕМОСТИ v3.0")
     print("   БОТ ЖИВОЙ НА RAILWAY")
-    print("=" * 60)
-    print(f"   Запуск: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*60)
     print(f"   URL: https://{os.getenv('RAILWAY_STATIC_URL', 'localhost:8080')}")
-    print("=" * 60)
+    print("="*60)
 
     await system.start()
-
     try:
         while system.is_running:
             await asyncio.sleep(1)
-    except:
-        pass
     finally:
         await system.shutdown()
 
 if __name__ == "__main__":
-    if sys.version_info < (3, 7):
-        print("Python 3.7+ required")
-        sys.exit(1)
     asyncio.run(main())
-
