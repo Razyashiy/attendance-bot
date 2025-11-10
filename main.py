@@ -1,6 +1,7 @@
 import asyncio
 import signal
 import os
+import uvicorn
 from datetime import datetime
 import sqlite3
 import aiohttp
@@ -129,5 +130,6 @@ async def export():
 
 # === ЗАПУСК ===
 if __name__ == "__main__":
+    import uvicorn
     port = int(os.getenv("PORT", 8080))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
