@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Посещаемость Pro</title>
+    <meta name="theme-color" content="#1e1b4b">
+    <link rel="manifest" href="data:application/manifest+json,{
+        \"name\": \"Посещаемость Pro\",
+        \"short_name\": \"Посещаемость\",
+        \"start_url\": \"/dashboard\",
+        \"display\": \"standalone\",
+        \"background_color\": \"#1e1b4b\",
+        \"theme_color\": \"#6366f1\",
+        \"icons\": [{
+            \"src\": \"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E✅%3C/text%3E%3C/svg%3E\",
+            \"sizes\": \"192x192\",
+            \"type\": \"image/svg+xml\"
+        }]
+    }">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f0f1e;
+            --bg-light: #f8fafc;
+            --card-dark: rgba(30, 27, 75, 0.5);
+            --card-light: #ffffff;
+            --text-dark: #e0e7ff;
+            --text-light: #1e293b;
+            --text-muted: #94a3b8;
+            --primary: #6366f1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border-dark: rgba(99, 102, 241, 0.3);
+            --border-light: #e5e7eb;
+            --glass: rgba(255, 255, 255, 0.05);
+            --font-size-base: 1rem;
+            --spacing-unit: 1rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-dark);
+            min-height: 100vh;
+            font-size: var(--font-size-base);
+            line-height: 1.5;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        body.light {
+            background: var(--bg-light);
+            color: var(--text-light);
+        }
+
+        .container {
+            max-width: min(90vw, 36rem);
+            margin: 0 auto;
+            padding: var(--spacing-unit);
+        }
+
+        .header {
+            text-align: center;
+            padding: var(--spacing-unit);
+            margin-bottom: calc(var(--spacing-unit) * 1.5);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--card-dark);
+            border-radius: 1rem;
+            backdrop-filter: blur(10px);
+            animation: fadeInDown 0.6s ease-out;
+        }
+
+        body.light .header {
+            background: var(--card-light);
+            box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            font-size: calc(var(--font-size-base) * 1.5);
+            font-weight: 700;
+            background: linear-gradient(90deg, #818cf8, #c4b5fd);
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+        }
+
+        @supports not (background-clip: text) {
+            .logo { color: #818cf8; }
+        }
+
+        .subtitle {
+            font-size: calc(var(--font-size-base) * 0.875);
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+            gap: var(--spacing-unit);
+            margin: calc(var(--spacing-unit) * 1.5) 0;
+        }
+
+        .stat-card {
+            background: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: var(--spacing-unit);
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+            backdrop-filter: blur(10px);
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        body.light .stat-card {
+            background: var(--card-light);
+            border: 1px solid var(--border-light);
+            box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.1);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-0.25rem);
+            box-shadow: 0 0.5rem 1rem rgba(99, 102, 241, 0.2);
+        }
+
+        .stat-icon {
+            font-size: calc(var(--font-size-base) * 1.5);
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: calc(var(--font-size-base) * 0.875);
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: calc(var(--font-size-base) * 1.75);
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        body.light .stat-value { color: var(--text-light); }
+
+        .stat-change {
+            font-size: calc(var(--font-size-base) * 0.75);
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .section {
+            background: var(--card-dark);
+            border-radius: 1rem;
+            padding: var(--spacing-unit);
+            margin-bottom: calc(var(--spacing-unit) * 1.5);
+            backdrop-filter: blur(10px);
+        }
+
+        body.light .section {
+            background: var(--card-light);
+            box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-size: calc(var(--font-size-base) * 1.125);
+            font-weight: 600;
+            margin-bottom: var(--spacing-unit);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chart-container {
+            height: 16rem;
+            margin-bottom: var(--spacing-unit);
+        }
+
+        .activity-list {
+            max-height: 20rem;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-dark);
+            animation: slideInLeft 0.4s ease-out;
+        }
+
+        body.light .activity-item {
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .activity-item:last-child { border-bottom: none; }
+
+        .activity-avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: calc(var(--font-size-base) * 0.875);
+            margin-right: 0.75rem;
+        }
+
+        .activity-name {
+            font-size: calc(var(--font-size-base) * 0.9375);
+            font-weight: 600;
+        }
+
+        .activity-time {
+            font-size: calc(var(--font-size-base) * 0.75);
+            color: var(--text-muted);
+        }
+
+        .activity-method {
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.75rem;
+            font-size: calc(var(--font-size-base) * 0.75);
+            font-weight: 600;
+        }
+
+        .method-nfc { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+        .method-face { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .method-manual { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+
+        .fab {
+            position: fixed;
+            bottom: calc(var(--spacing-unit) * 1.5);
+            right: calc(var(--spacing-unit) * 1.5);
+            width: 3.5rem;
+            height: 3.5rem;
+            background: var(--primary);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: calc(var(--font-size-base) * 1.25);
+            box-shadow: 0 0.25rem 1rem rgba(99, 102, 241, 0.3);
+            cursor: pointer;
+            z-index: 100;
+            transition: transform 0.3s;
+        }
+
+        .fab:hover {
+            transform: scale(1.1) rotate(90deg);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            bottom: calc(var(--spacing-unit) * 6);
+            right: calc(var(--spacing-unit) * 1.5);
+            width: 3rem;
+            height: 3rem;
+            background: var(--glass);
+            border: 1px solid var(--border-dark);
+            border-radius: 50%;
+            color: var(--text-dark);
+            font-size: calc(var(--font-size-base) * 1.125);
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        body.light .theme-toggle {
+            border: 1px solid var(--border-light);
+            background: #e5e7eb;
+            color: var(--text-light);
+        }
+
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-1rem); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(1rem); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-1rem); } to { opacity: 1; transform: translateX(0); } }
+
+        @media (min-width: 48rem) {
+            .container { max-width: 48rem; }
+            .stats-grid { grid-template-columns: repeat(4, 1fr); }
+            .chart-container { height: 20rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Посещаемость Pro</div>
+            <div class="subtitle">IT Колледж • <span id="current-time"></span></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <i class="fas fa-users stat-icon"></i>
+                <div class="stat-label">Всего студентов</div>
+                <div class="stat-value" id="totalStudents">—</div>
+                <div class="stat-change">Активных: <span id="activeStudents">—</span></div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-check-circle stat-icon"></i>
+                <div class="stat-label">Сегодня на занятиях</div>
+                <div class="stat-value" id="todayPresent">—</div>
+                <div class="stat-change">+<span id="todayChange">0</span> за час</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-desktop stat-icon"></i>
+                <div class="stat-label">Терминалы</div>
+                <div class="stat-value" id="activeTerminals">—</div>
+                <div class="stat-change">Онлайн</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-exclamation-triangle stat-icon"></i>
+                <div class="stat-label">Подозрительно</div>
+                <div class="stat-value" id="suspiciousEvents">0</div>
+                <div class="stat-change">За день</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><i class="fas fa-chart-line"></i> Посещаемость за неделю</div>
+            <div class="chart-container">
+                <canvas id="attendanceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><i class="fas fa-history"></i> Последние отметки</div>
+            <div class="activity-list" id="activityList">
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin"></i> Загрузка...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="fab" id="refreshBtn" title="Обновить"><i class="fas fa-sync-alt"></i></button>
+    <button class="theme-toggle" id="themeToggle" title="Сменить тему"><i class="fas fa-moon"></i></button>
+
+    <script>
+        // Тема
+        function toggleTheme() {
+            document.body.classList.toggle('light');
+            const icon = document.getElementById('themeToggle').querySelector('i');
+            icon.classList.toggle('fa-moon');
+            icon.classList.toggle('fa-sun');
+            localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+        }
+
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light');
+            document.getElementById('themeToggle').querySelector('i').classList.replace('fa-moon', 'fa-sun');
+        }
+
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+        // Время
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // График
+        let chart;
+        function initChart() {
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+                    datasets: [{
+                        label: 'Присутствует',
+                        data: [130, 138, 142, 145, 139, 118, 0],
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#c4b5fd',
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(30, 27, 75, 0.9)' } },
+                    scales: {
+                        y: { grid: { color: 'rgba(148, 163, 184, 0.2)' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+
+        // Данные
+        async function fetchData() {
+            try {
+                const res = await axios.get('/api/stats');
+                const d = res.data.data || {};
+
+                document.getElementById('totalStudents').textContent = d.total_students || 0;
+                document.getElementById('activeStudents').textContent = d.active_students || 0;
+                document.getElementById('todayPresent').textContent = d.today_attendance || 0;
+                document.getElementById('activeTerminals').textContent = '3';
+                document.getElementById('suspiciousEvents').textContent = '0';
+
+                if (chart) {
+                    chart.data.datasets[0].data[4] = d.today_attendance || 0;
+                    chart.update('quiet');
+                }
+
+                const activities = [
+                    { name: "Алексей Иванов", method: "NFC", time: "08:31", avatar: "АИ" },
+                    { name: "Мария Петрова", method: "Face ID", time: "08:29", avatar: "МП" },
+                    { name: "Дмитрий Соколов", method: "Ручная", time: "08:27", avatar: "ДС" }
+                ];
+
+                document.getElementById('activityList').innerHTML = activities.map((a, i) => `
+                    <div class="activity-item" style="animation-delay: ${i * 0.1}s;">
+                        <div class="activity-avatar">${a.avatar}</div>
+                        <div class="activity-name">${a.name}</div>
+                        <div class="activity-method method-${a.method === 'NFC' ? 'nfc' : a.method === 'Face ID' ? 'face' : 'manual'}">
+                            ${a.method}
+                        </div>
+                        <div class="activity-time">${a.time}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Ошибка:', err);
+            }
+        }
+
+        // Обновление
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            document.body.classList.add('loading');
+            fetchData().finally(() => {
+                document.body.classList.remove('loading');
+                const btn = document.getElementById('refreshBtn');
+                btn.style.transform = 'rotate(360deg)';
+                setTimeout(() => btn.style.transform = '', 300);
+            });
+        });
+
+        setInterval(fetchData, 30000);
+
+        // PWA
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.createElement('div');
+            installBtn.innerHTML = `<i class="fas fa-download"></i> Установить`;
+            installBtn.style.cssText = `
+                position: fixed; bottom: calc(var(--spacing-unit) * 10); right: calc(var(--spacing-unit) * 1.5);
+                background: #6366f1; color: white; padding: 0.75rem 1.25rem;
+                border-radius: 1.5rem; font-size: calc(var(--font-size-base) * 0.875);
+                cursor: pointer; box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.2);
+            `;
+            installBtn.onclick = () => {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => installBtn.remove());
+            };
+            document.body.appendChild(installBtn);
+        });
+
+        // Оффлайн
+        window.addEventListener('offline', () => {
+            document.getElementById('activityList').innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <i class="fas fa-wifi"></i> Нет интернета
+                </div>
+            `;
+        });
+
+        window.addEventListener('load', () => {
+            initChart();
+            fetchData();
+        });
+    </script>
+</body>
+</html>
