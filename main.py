@@ -13,8 +13,7 @@ import os
 # --------------------- Создаём app ПЕРВЫМ! ---------------------
 app = FastAPI(title="SYSTEMA CONTROLA POSESHCHAEMOSTI")
 
-# Монтируем статику только после создания app
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+
 
 # Для шаблонов (если будут)
 templates = Jinja2Templates(directory="templates")
@@ -108,3 +107,4 @@ if __name__ == "__main__":
 
     # Убираем дублирование asyncio.run(main())
     asyncio.run(main())
+
