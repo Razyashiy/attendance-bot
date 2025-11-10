@@ -1,103 +1,135 @@
 import asyncio
 import signal
-import sys
+import os
 from datetime import datetime
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
-import uvicorn
-import os
+import sqlite3
+import pandas as pd
+import aiohttp
 
-# Импортируем после app
-from webhook_server import webhook_server
-from logging_config import logger
+from fastapi import FastAPI, Request, Query
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 
-app = FastAPI(title="СИСТЕМА КОНТРОЛЯ ПОСЕЩАЕМОСТИ")
+app = FastAPI(title="СИСТЕМА ПОСЕЩАЕМОСТИ — ЖИВЁТ 24/7")
 
-class AttendanceSystem:
-    def __init__(self):
-        self.is_running = False
-        logger.info("Attendance System initialized")
+# === БАЗА ДАННЫХ ===
+conn = sqlite3.connect("attendance.db", check_same_thread=False)
+conn.execute("""CREATE TABLE IF NOT EXISTS log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    action TEXT,
+    time TEXT
+)""")
+conn.commit()
 
-    async def start(self):
-        if self.is_running:
-            return
-        self.is_running = True
-        logger.info("Starting system...")
+# === СПИСОК УЧЕНИКОВ (добавляй своих) ===
+STUDENTS = ["ИВАНОВ", "ПЕТРОВ", "СИДОРОВ", "КУЗНЕЦОВ", "СМИРНОВА"]
 
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            signal.signal(sig, self._signal_handler)
+# === ТЕЛЕГРАМ ТОКЕН И ЧАТ ===
+BOT_TOKEN = "8399420502:AAHqJPTmsD0K7r1spXziNOS3JDCjiH5lDkI"
+CHAT_ID = "ТВОЙ_CHAT_ID"  # ← замени на свой! (узнай через @userinfobot)
 
-        try:
-            await webhook_server.start()
-            logger.info("Webhook server started")
-        except Exception as e:
-            logger.error(f"Start failed: {e}")
-            self.is_running = False
-            raise
+# === ГОЛОСОВОЕ СООБЩЕНИЕ В ТГ ===
+async def send_tg(text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": CHAT_ID, "text": text}
+    async with aiohttp.ClientSession() as session:
+        await session.post(url, data=payload)
 
-    def _signal_handler(self, signum, frame):
-        logger.info(f"Signal {signum} → shutdown")
-        self.is_running = False
-        asyncio.create_task(self.shutdown())
-
-    async def shutdown(self):
-        await webhook_server.stop()
-        logger.info("Shutdown complete")
-
-# ГЛАВНАЯ СТРАНИЦА — КРАСИВАЯ, ЗЕЛЁНАЯ, БЕЗ static
+# === ГЛАВНАЯ ===
 @app.get("/")
 async def root():
     return HTMLResponse("""
-    <html>
-        <head>
-            <title>СИСТЕМА КОНТРОЛЯ ПОСЕЩАЕМОСТИ</title>
-            <meta charset="utf-8">
-            <style>
-                body {font-family: Arial; text-align: center; margin-top: 10%; background: #000; color: #0f0;}
-                h1 {font-size: 3.5em; text-shadow: 0 0 20px #0f0;}
-                h2 {font-size: 2em; color: #0f8;}
-                a {color: #0f0; font-size: 1.5em; text-decoration: none;}
-                a:hover {text-shadow: 0 0 10px #0f0;}
-            </style>
-        </head>
-        <body>
-            <h1>СИСТЕМА КОНТРОЛЯ ПОСЕЩАЕМОСТИ</h1>
-            <h2>БОТ ЖИВОЙ 24/7 НА RAILWAY</h2>
-            <p>Вебхук: <code>/webhook/telegram</code></p>
-            <p><a href="/health">Health Check</a></p>
-        </body>
-    </html>
+    <html><head><title>СИСТЕМА ПОСЕЩАЕМОСТИ</title><meta charset="utf-8">
+    <style>body{font-family:Arial;background:#000;color:#0f0;text-align:center;padding-top:10%;}
+    h1{font-size:3em;text-shadow:0 0 20px #0f0;} a{color:#0f0;font-size:2em;}</style></head>
+    <body><h1>БОТ ЖИВОЙ 24/7</h1>
+    <p>Вебхук: /webhook/telegram</p>
+    <p><a href="/admin">АДМИНКА</a> | <a href="/health">HEALTH</a></p>
+    </body></html>
     """)
 
+# === ЗДОРОВЬЕ ===
 @app.get("/health")
 async def health():
-    return {"status": "OK", "time": datetime.now().isoformat(), "bot": "ЖИВОЙ"}
+    return {"status": "OK", "time": datetime.now().isoformat()}
 
+# === ВЕБХУК ТЕЛЕГРАМ (ПРОСТО РАБОТАЕТ) ===
 @app.post("/webhook/telegram")
 async def telegram_webhook(request: Request):
     try:
         update = await request.json()
-        logger.info(f"Update: {update.get('message', {}).get('text', 'no text')}")
-    except:
-        logger.error("Bad update")
+        msg = update.get("message", {})
+        text = msg.get("text", "")
+        chat_id = msg.get("chat", {}).get("id")
+        
+        if text == "/start":
+            await send_tg("Система запущена!")
+        elif text == "/admin":
+            await send_tg("Админка: https://твой-проект.up.railway.app/admin")
+            
+    except Exception as e:
+        print("Ошибка вебхука:", e)
     return JSONResponse({"ok": True})
 
-async def main():
-    system = AttendanceSystem()
-    print("="*60)
-    print("   СИСТЕМА КОНТРОЛЯ ПОСЕЩАЕМОСТИ v3.0")
-    print("   БОТ ЖИВОЙ НА RAILWAY")
-    print("="*60)
-    print(f"   URL: https://{os.getenv('RAILWAY_STATIC_URL', 'localhost:8080')}")
-    print("="*60)
+# === ВХОД / ВЫХОД ===
+@app.get("/enter")
+async def enter(user: str = Query(...)):
+    name = user.upper()
+    time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("INSERT INTO log (name, action, time) VALUES (?, 'ВХОД', ?)", (name, time))
+    conn.commit()
+    await send_tg(f"Добро пожаловать, {name}!")
+    return HTMLResponse(f"<h1 style='color:green;'>ВХОД {name}</h1><meta http-equiv='refresh' content='2;url=/'>")
 
-    await system.start()
-    try:
-        while system.is_running:
-            await asyncio.sleep(1)
-    finally:
-        await system.shutdown()
+@app.get("/leave")
+async def leave(user: str = Query(...)):
+    name = user.upper()
+    time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("INSERT INTO log (name, action, time) VALUES (?, 'ВЫХОД', ?)", (name, time))
+    conn.commit()
+    await send_tg(f"До свидания, {name}!")
+    return HTMLResponse(f"<h1 style='color:red;'>ВЫХОД {name}</h1><meta http-equiv='refresh' content='2;url=/'>")
+
+# === АДМИНКА ===
+@app.get("/admin")
+async def admin():
+    rows = conn.execute("SELECT * FROM log ORDER BY id DESC LIMIT 200").fetchall()
+    html = "<html><head><title>АДМИНКА</title><meta charset='utf-8'><style>body{background:#000;color:#0f0;font-family:Arial;padding:20px;}"
+    html += "table{border-collapse:collapse;width:100%;}th,td{border:1px solid #0f0;padding:10px;}</style></head><body>"
+    html += "<h1>ПОСЛЕДНИЕ 200 ОТМЕТОК</h1><table><tr><th>ID</th><th>ФАМИЛИЯ</th><th>ДЕЙСТВИЕ</th><th>ВРЕМЯ</th></tr>"
+    for r in rows:
+        color = "lime" if r[2] == "ВХОД" else "red"
+        html += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td style='color:{color};'>{r[2]}</td><td>{r[3]}</td></tr>"
+    html += "</table><br><a href='/export' style='color:cyan;font-size:2em;'>СКАЧАТЬ EXCEL</a>"
+    html += " | <a href='/' style='color:yellow;'>НА ГЛАВНУЮ</a></body></html>"
+    return HTMLResponse(html)
+
+# === ЭКСПОРТ В EXCEL ===
+@app.get("/export")
+async def export():
+    df = pd.DataFrame(conn.execute("SELECT * FROM log ORDER BY time DESC").fetchall(),
+                      columns=["ID", "ФАМИЛИЯ", "ДЕЙСТВИЕ", "ВРЕМЯ"])
+    df.to_excel("посещаемость.xlsx", index=False)
+    return FileResponse("посещаемость.xlsx", filename="посещаемость.xlsx")
+
+# === ПРОВЕРКА ПРОПУСКОВ КАЖДЫЕ 5 МИНУТ ===
+async def check_absent():
+    while True:
+        await asyncio.sleep(300)
+        today = datetime.now().strftime("%Y-%m-%d")
+        present = [row[0] for row in conn.execute(
+            "SELECT name FROM log WHERE time LIKE ? AND action='ВХОД'", (f"{today}%",)).fetchall()]
+        absent = [s for s in STUDENTS if s not in present]
+        if absent:
+            await send_tg(f"ПРОПУСК: {', '.join(absent)}")
+
+# === ЗАПУСК ===
+@app.on_event("startup")
+async def startup():
+    asyncio.create_task(check_absent())
+    print("Система запущена — БОТ ЖИВОЙ 24/7")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
