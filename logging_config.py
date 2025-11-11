@@ -3,7 +3,6 @@ import sys
 from pathlib import Path
 
 def setup_logging():
-    """Настройка системы логирования"""
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
     
@@ -11,10 +10,7 @@ def setup_logging():
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    file_handler = logging.FileHandler(
-        log_dir / 'attendance_system.log',
-        encoding='utf-8'
-    )
+    file_handler = logging.FileHandler(log_dir / 'attendance_system.log', encoding='utf-8')
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)
     
@@ -27,10 +23,6 @@ def setup_logging():
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
     
-    logging.getLogger('socketio').setLevel(logging.WARNING)
-    logging.getLogger('engineio').setLevel(logging.WARNING)
-    
     return root_logger
 
-# Инициализация логирования
 logger = setup_logging()
