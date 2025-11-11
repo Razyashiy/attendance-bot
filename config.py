@@ -1,48 +1,23 @@
 from dataclasses import dataclass, field
-from typing import Optional
-
-@dataclass
-class DatabaseConfig:
-    path: str = "data/attendance.db"
-    timeout: int = 30
-    init_timeout: int = 10
-    retry_attempts: int = 3
-
-@dataclass
-class ServerConfig:
-    host: str = "localhost"
-    port: int = 8080
-    debug: bool = True
-    workers: int = 1
-    max_requests: int = 1000
-    request_timeout: int = 30
+import os
+from typing import List
 
 @dataclass
 class TelegramConfig:
-    webhook_url: str = "http://localhost:8080/webhook/telegram"
-    secret_token: str = "8399420502:AAHqJPTmsD0K7r1spXziNOS3JDCjiH5lDkI"  # Замени на реальный!
-    max_message_length: int = 4096
-    allowed_commands: list = field(default_factory=lambda: ['/start', '/register', '/stats', '/help'])
+    bot_token: str = field(default_factory=lambda: os.getenv("BOT_TOKEN"))
+    webhook_secret: str = os.getenv("WEBHOOK_SECRET", "super_secret_2025")
+    admin_chat_id: int = int(os.getenv("ADMIN_CHAT_ID", "0"))
 
-@dataclass
-class SecurityConfig:
-    cors_origins: list = field(default_factory=lambda: ["http://localhost:3000"])
-    rate_limit_per_minute: int = 10
-    max_request_size: int = 1024 * 1024  # 1MB
+    def __post_init__(self):
+        if not self.bot_token:
+            raise ValueError("BOT_TOKEN")
+        if self.admin_chat_id == 0:
+            raise ValueError("ADMIN_CHAT_ID")
 
 @dataclass
 class SystemConfig:
-    database: DatabaseConfig = field(default_factory=DatabaseConfig)
-    server: ServerConfig = field(default_factory=ServerConfig)
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
-    security: SecurityConfig = field(default_factory=SecurityConfig)
-    system_name: str = "Attendance Control System"
-    version: str = "1.0.0"
-    environment: str = "development"
-    
-    @classmethod
-    def load(cls) -> 'SystemConfig':
-        return cls()
+    public_url: str = os.getenv("PUBLIC_URL", "http://localhost:8080")
+    environment: str = os.getenv("ENVIRONMENT", "development")
 
-# Глобальный конфиг
-config = SystemConfig.load()
+config = SystemConfig()
