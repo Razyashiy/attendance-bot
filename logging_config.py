@@ -10,7 +10,10 @@ def setup_logging():
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    file_handler = logging.FileHandler(log_dir / 'attendance_system.log', encoding='utf-8')
+    file_handler = logging.FileHandler(
+        log_dir / 'attendance_system.log',
+        encoding='utf-8'
+    )
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)
     
