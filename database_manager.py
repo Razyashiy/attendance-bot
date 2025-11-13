@@ -1,7 +1,9 @@
 import sqlite3
+import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List
+
 from logging_config import logger
 
 class DatabaseManager:
@@ -58,6 +60,13 @@ class DatabaseManager:
             logger.error(f"Ошибка записи посещения: {e}")
             return False
 
+    def get_student_by_telegram_id(self, telegram_id: int) -> Dict[str, Any]:
+        cursor = self.conn.execute("SELECT * FROM students WHERE telegram_id = ?", (telegram_id,))
+        row = cursor.fetchone()
+        if row:
+            return {"telegram_id": row[0], "first_name": row[1], "last_name": row[2]}
+        return {}
+
     def get_attendance_stats(self) -> Dict[str, Any]:
         total = self.conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
         today = self.conn.execute(
@@ -65,10 +74,5 @@ class DatabaseManager:
         ).fetchone()[0]
         return {"total_students": total, "today_attendance": today}
 
-def get_student_by_telegram_id(self, telegram_id: int) -> Dict:
-    cursor = self.conn.execute("SELECT * FROM students WHERE telegram_id = ?", (telegram_id,))
-    row = cursor.fetchone()
-    return {"id": row[0], "first_name": row[1]} if row else {}
-    
 database_manager = DatabaseManager()
 
