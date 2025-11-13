@@ -74,4 +74,11 @@ async def start_polling():
 
 # ЭКСПОРТ ФУНКЦИИ
 __all__ = ["start_polling"]
+# ... (всё как раньше, но кнопка теперь с URL)
+
+kb = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="Я в классе (QR)", url=f"{config.public_url}/scan")],
+    [InlineKeyboardButton(text="Статистика", callback_data="stats")],
+    [InlineKeyboardButton(text="Помощь", callback_data="help")],
+])
 
