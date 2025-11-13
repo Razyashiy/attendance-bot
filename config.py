@@ -20,4 +20,3 @@ class SystemConfig:
     public_url: str = os.getenv("PUBLIC_URL", "http://localhost:8080")
 
 config = SystemConfig()
-
