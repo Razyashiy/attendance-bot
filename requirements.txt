@@ -1,13 +1,14 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+fastapi
+uvicorn[standard]
+python-multipart
 pandas
-openpyxl==3.1.2
-aiogram==3.2.0
-aiohttp==3.9.1
-qrcode[pil]==7.4.2
+openpyxl
+aiogram
+aiohttp
+qrcode[pil]
 Pillow
-python-dotenv==1.0.1
-aiosqlite==0.20.0
+python-dotenv
+aiosqlite
+
 
 
