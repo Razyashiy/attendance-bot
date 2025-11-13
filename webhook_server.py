@@ -10,7 +10,7 @@ app = FastAPI()
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "time": "November 13, 2025"}
 
 # ОТДЕЛЬНЫЙ QR-СКАНЕР ПО ССЫЛКЕ (КАМЕРА РАБОТАЕТ НА 100%)
 @app.get("/scan")
@@ -20,7 +20,7 @@ async def scan():
     <html>
     <head>
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>QR Посещаемость</title>
+        <title>QR Посещаемость — Школа Рига</title>
         <style>
             body {margin:0;background:#000;color:#0f0;text-align:center;font-family:sans-serif;}
             video {width:100%;height:80vh;object-fit:cover;}
@@ -29,7 +29,7 @@ async def scan():
     </head>
     <body>
         <video id="video" autoplay playsinline></video>
-        <div id="status">Наведи на QR-код...</div>
+        <div id="status">Наведи на QR-код в классе...</div>
         <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
         <script>
         navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
@@ -54,14 +54,15 @@ async def scan():
                 }
             }, 500);
         }).catch(err => {
-            document.getElementById('status').innerText = 'Камера недоступна — разреши доступ';
+            document.getElementById('status').innerText = 'Камера недоступна — разреши доступ в настройках';
         });
         </script>
     </body>
     </html>
     """)
 
-# ПРИЁМ ОТМЕТКИ
+# ПРИЁМ ОТМЕТКИ ОТ СКАНЕРА
 @app.get("/record")
 async def record(qr: str):
+    # Здесь можно добавить логику класса по QR
     return JSONResponse({"status": "ok", "message": "Отметка принята!"})
