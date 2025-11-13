@@ -5,10 +5,8 @@ from telegram_bot import start_polling
 
 app = FastAPI()
 
-# Веб-панель и QR-сканер
 app.mount("/", webhook_app)
 
-# Запуск бота
 @app.on_event("startup")
 async def startup():
     asyncio.create_task(start_polling())
