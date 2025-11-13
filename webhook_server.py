@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from config import config
 from database_manager import database_manager
-from telegram_bot import bot  # ← ЭТО БЫЛО ПРОПУЩЕНО!
+from telegram_bot import bot
 from logging_config import logger
 from datetime import datetime
 
@@ -12,7 +12,6 @@ app = FastAPI()
 async def health():
     return {"status": "ok", "bot": "100% working", "time": "November 13, 2025"}
 
-# QR-КАМЕРА
 @app.get("/qr_universal")
 async def qr_universal():
     return HTMLResponse("""
@@ -50,7 +49,6 @@ async def qr_universal():
     </html>
     """)
 
-# ПРИЁМ ОТМЕТКИ — РАБОТАЕТ!
 @app.get("/record")
 async def record(qr: str, request: Request):
     user_id = request.headers.get("X-Telegram-WebApp-User")
@@ -61,8 +59,7 @@ async def record(qr: str, request: Request):
         user_id = int(user_id)
         database_manager.record_attendance(user_id, "QR")
         
-        # Уведомление админу
-        full_name = "Студент"  # можно расширить
+        full_name = "Студент"
         await bot.send_message(
             config.telegram.admin_chat_id,
             f"ВХОД\n{full_name}\n{datetime.now().strftime('%d.%m %H:%M:%S')} | QR"
