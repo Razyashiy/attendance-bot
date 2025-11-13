@@ -12,7 +12,7 @@ app = FastAPI()
 async def health():
     return {"status": "ok"}
 
-# ОТДЕЛЬНЫЙ QR-СКАНЕР (открывается в браузере — камера работает 100%)
+# ОТДЕЛЬНЫЙ QR-СКАНЕР ПО ССЫЛКЕ (КАМЕРА РАБОТАЕТ НА 100%)
 @app.get("/scan")
 async def scan():
     return HTMLResponse("""
@@ -64,6 +64,4 @@ async def scan():
 # ПРИЁМ ОТМЕТКИ
 @app.get("/record")
 async def record(qr: str):
-    # Здесь можно добавить логику класса по QR
     return JSONResponse({"status": "ok", "message": "Отметка принята!"})
-
