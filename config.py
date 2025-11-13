@@ -10,14 +10,13 @@ class TelegramConfig:
 
     def __post_init__(self):
         if not self.bot_token:
-            raise ValueError("BOT_TOKEN")
+            raise ValueError("BOT_TOKEN обязателен в .env!")
         if self.admin_chat_id == 0:
-            raise ValueError("ADMIN_CHAT_ID")
+            raise ValueError("ADMIN_CHAT_ID обязателен в .env!")
 
 @dataclass
 class SystemConfig:
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     public_url: str = os.getenv("PUBLIC_URL", "http://localhost:8080")
-    environment: str = os.getenv("ENVIRONMENT", "development")
 
 config = SystemConfig()
