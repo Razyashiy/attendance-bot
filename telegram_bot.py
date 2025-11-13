@@ -1,30 +1,52 @@
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import CommandStart, Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram import F
 from database_manager import database_manager
 from logging_config import logger
 from config import config
-from typing import Dict
 
-class TelegramBot:
-    def __init__(self):
-        self.db = database_manager
+bot = Bot(token=config.telegram.bot_token)
+dp = Dispatcher()
 
-    async def process_message(self, user_id: int, text: str, user_data: dict) -> dict:
-        first_name = user_data.get("first_name", "Студент")
-        last_name = user_data.get("last_name", "")
-        full_name = f"{first_name} {last_name}".strip()
+@dp.message(CommandStart())
+async def start(message: types.Message):
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name or "Студент"
+    last_name = message.from_user.last_name or ""
+    
+    database_manager.register_student(user_id, first_name, last_name)
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Я в классе (QR)", web_app=WebAppInfo(url=f"{config.public_url}/qr_universal"))],
+        [InlineKeyboardButton(text="Статистика", callback_data="stats")],
+        [InlineKeyboardButton(text="Помощь", callback_data="help")],
+    ])
+    
+    await message.answer(
+        f"Привет, {first_name}!\nТы зарегистрирован!\n\nВыбери действие:",
+        reply_markup=kb
+    )
 
-        if text == "/start":
-            self.db.register_student(user_id, first_name, last_name)
-            return {"response": f"Привет, {full_name}!\nТы зарегистрирован в системе посещаемости!"}
+@dp.callback_query(F.data == "stats")
+async def stats(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    stats = database_manager.get_attendance_stats()
+    await call.message.edit_text(
+        f"Статистика системы:\nВсего студентов: {stats['total_students']}\nСегодня: {stats['today_attendance']}",
+        reply_markup=call.message.reply_markup
+    )
+    await call.answer()
 
-        if text == "/stats":
-            stats = self.db.get_attendance_stats()
-            return {"response": f"Статистика системы:\nВсего студентов: {stats['total_students']}\nСегодня на уроке: {stats['today_attendance']}"}
+@dp.callback_query(F.data == "help")
+async def help(call: types.CallbackQuery):
+    await call.message.edit_text(
+        "/start — главное меню\n/stats — статистика\nЯ в классе — отметка по QR",
+        reply_markup=call.message.reply_markup
+    )
+    await call.answer()
 
-        if text.startswith("/qr"):
-            class_name = text.split()[1].upper() if len(text.split()) > 1 else "9A"
-            qr_url = f"{config.public_url}/qr_scan?class={class_name}"
-            return {"response": f"QR-код для класса {class_name}:\n{qr_url}"}
-
-        return {"response": "Доступные команды:\n/start — регистрация\n/stats — статистика\n/qr 9A — QR-код класса"}
-
-telegram_bot = TelegramBot()
+async def start_bot():
+    logger.info("Бот запущен в polling режиме")
+    await dp.start_polling(bot)
