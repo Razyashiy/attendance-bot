@@ -16,8 +16,9 @@ async def start(message: types.Message):
     first_name = message.from_user.first_name or "Студент"
     last_name = message.from_user.last_name or ""
 
-    # Регистрация
-    if not database_manager.get_student_by_telegram_id(user_id):
+    # Регистрация (ЭТО БЫЛО ПРОПУЩЕНО!)
+    cursor = database_manager.conn.execute("SELECT telegram_id FROM students WHERE telegram_id = ?", (user_id,))
+    if not cursor.fetchone():
         database_manager.register_student(user_id, first_name, last_name)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -48,13 +49,12 @@ async def help_cmd(call: types.CallbackQuery):
     )
     await call.answer()
 
-# Web App — запись посещения
+# ОТМЕТКА ПО QR
 @dp.message(F.web_app_data)
 async def webapp_data(message: types.Message):
     user_id = message.from_user.id
     database_manager.record_attendance(user_id, "QR")
     
-    # Уведомление админу
     full_name = f"{message.from_user.first_name} {message.from_user.last_name or ''}".strip()
     await bot.send_message(
         config.telegram.admin_chat_id,
@@ -66,3 +66,4 @@ async def webapp_data(message: types.Message):
 async def start_polling():
     logger.info("Бот запущен в polling-режиме")
     await dp.start_polling(bot)
+
