@@ -1,17 +1,19 @@
-from webhook_server import app
-from telegram_bot import start_bot
-import uvicorn
-import os
+import asyncio
+from fastapi import FastAPI
+from webhook_server import app as webhook_app
+from telegram_bot import start_polling
+
+app = FastAPI()
+
+# Подключаем веб-панель
+app.mount("/", webhook_app)
+
+# Запуск бота в фоне
+@app.on_event("startup")
+async def startup():
+    asyncio.create_task(start_polling())
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    task = asyncio.create_task(start_bot())
-    yield
-    task.cancel()
-
-app = FastAPI(lifespan=lifespan)
-
+    import uvicorn
+    import os
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8080)), reload=False)
