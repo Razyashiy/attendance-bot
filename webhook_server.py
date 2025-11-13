@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from config import config
 from database_manager import database_manager
 from telegram_bot import bot
+from logging_config import logger
 from datetime import datetime
 
 app = FastAPI()
@@ -11,7 +12,7 @@ app = FastAPI()
 async def health():
     return {"status": "ok"}
 
-# ОТДЕЛЬНЫЙ QR-СКАНЕР (РАБОТАЕТ БЕЗ Mini App!)
+# ОТДЕЛЬНЫЙ QR-СКАНЕР (открывается в браузере — камера работает 100%)
 @app.get("/scan")
 async def scan():
     return HTMLResponse("""
@@ -45,7 +46,7 @@ async def scan():
                     ctx.drawImage(video, 0, 0);
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const code = jsQR(imageData.data, canvas.width, canvas.height);
-                    if (code && code.data.includes('t.me')) {
+                    if (code) {
                         document.getElementById('status').innerText = 'Отметка принята!';
                         fetch('/record?qr=' + encodeURIComponent(code.data))
                         .then(() => setTimeout(() => location.reload(), 2000));
@@ -53,7 +54,7 @@ async def scan():
                 }
             }, 500);
         }).catch(err => {
-            document.getElementById('status').innerText = 'Камера недоступна';
+            document.getElementById('status').innerText = 'Камера недоступна — разреши доступ';
         });
         </script>
     </body>
@@ -62,8 +63,7 @@ async def scan():
 
 # ПРИЁМ ОТМЕТКИ
 @app.get("/record")
-async def record(qr: str, request: Request):
-    # Можно добавить проверку класса по QR
-    # Например: if qr.endswith("class_9A"): ...
-    return JSONResponse({"status": "ok"})
+async def record(qr: str):
+    # Здесь можно добавить логику класса по QR
+    return JSONResponse({"status": "ok", "message": "Отметка принята!"})
 
