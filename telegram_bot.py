@@ -3,6 +3,7 @@ import aiohttp
 import hashlib
 import hmac
 import json
+import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -494,4 +495,5 @@ class TelegramBot:
 
 # Глобальный экземпляр бота
 telegram_bot = TelegramBot()
+
 
