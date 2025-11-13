@@ -10,9 +10,9 @@ app = FastAPI()
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "bot": "100% working"}
+    return {"status": "ok", "time": "November 13, 2025"}
 
-# МИНИ-АПП С КАМЕРОЙ
+# НАТИВНЫЙ QR-СКАНЕР (РАБОТАЕТ В MINI APP!)
 @app.get("/qr_universal")
 async def qr_universal():
     return HTMLResponse("""
@@ -21,47 +21,53 @@ async def qr_universal():
     <head>
         <meta name="viewport" content="width=device-width,initial-scale=1">
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
+        <style>
+            body {margin:0;background:#000;color:#0f0;text-align:center;padding:40px;font-family:sans-serif;}
+            button {background:#0f0;color:#000;padding:15px 30px;font-size:1.5em;border:none;border-radius:12px;margin:20px;cursor:pointer;}
+        </style>
     </head>
-    <body style="margin:0;background:#000;">
-        <video id="v" autoplay playsinline style="width:100%;height:100vh;"></video>
-        <div id="s" style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);color:#0f0;font-size:1.5em;background:rgba(0,0,0,0.7);padding:15px 30px;border-radius:15px;">
-            Наведи на QR...
-        </div>
-        <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <body>
+        <h1>Отметка посещаемости</h1>
+        <p>Нажми кнопку и наведи камеру на QR-код</p>
+        <button onclick="scan()">СКАНИРОВАТЬ QR</button>
         <script>
-        navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}})
-        .then(stream => {
-            document.getElementById('v').srcObject = stream;
-            setInterval(() => {
-                let v = document.getElementById('v');
-                let c = document.createElement('canvas');
-                c.width = v.videoWidth; c.height = v.videoHeight;
-                c.getContext('2d').drawImage(v, 0, 0);
-                let code = jsQR(c.getContext('2d').getImageData(0,0,c.width,c.height).data, c.width, c.height);
-                if (code && code.data.includes('t.me')) {
-                    document.getElementById('s').innerText = 'Отметка принята!';
-                    fetch('/record?qr=' + encodeURIComponent(code.data))
-                    .then(() => Telegram.WebApp.close());
-                }
-            }, 500);
+        function scan() {
+            Telegram.WebApp.showScanQrPopup({text: "Наведи на QR в классе"});
+        }
+
+        Telegram.WebApp.onEvent('qrTextReceived', function(data) {
+            Telegram.WebApp.closeScanQrPopup();
+            fetch('/record?qr=' + encodeURIComponent(data.data))
+            .then(() => {
+                Telegram.WebApp.showAlert('Отметка принята! ✅');
+                setTimeout(() => Telegram.WebApp.close(), 1000);
+            });
         });
         </script>
     </body>
     </html>
     """)
 
-# ПРИЁМ ОТМЕТКИ — ЭТО БЫЛО ПРОПУЩЕНО!
+# ПРИЁМ ОТМЕТКИ
 @app.get("/record")
 async def record(qr: str, request: Request):
-    user_id = request.headers.get("X-Telegram-WebApp-User")
-    if not user_id:
+    user_data = request.headers.get("X-Telegram-WebApp-Init-Data")
+    if not user_data:
         return JSONResponse({"status": "error"})
-    
+
     try:
-        user_id = int(user_id)
+        # Парсим user_id из initData
+        import urllib.parse
+        params = dict(urllib.parse.parse_qsl(user_data))
+        user = eval(params.get("user", "{}"))
+        user_id = int(user.get("id"))
+        
         database_manager.record_attendance(user_id, "QR")
-        full_name = "Студент"
-        await bot.send_message(config.telegram.admin_chat_id, f"ВХОД\n{full_name}\n{datetime.now().strftime('%H:%M:%S')} | QR")
+        await bot.send_message(
+            config.telegram.admin_chat_id,
+            f"ВХОД\nСтудент\n{datetime.now().strftime('%H:%M:%S')} | QR"
+        )
     except:
         pass
+    
     return JSONResponse({"status": "ok"})
