@@ -65,4 +65,10 @@ class DatabaseManager:
         ).fetchone()[0]
         return {"total_students": total, "today_attendance": today}
 
+def get_student_by_telegram_id(self, telegram_id: int) -> Dict:
+    cursor = self.conn.execute("SELECT * FROM students WHERE telegram_id = ?", (telegram_id,))
+    row = cursor.fetchone()
+    return {"id": row[0], "first_name": row[1]} if row else {}
+    
 database_manager = DatabaseManager()
+
