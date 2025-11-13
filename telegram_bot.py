@@ -24,10 +24,10 @@ async def start(message: types.Message):
         database_manager.register_student(user_id, first_name, last_name)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Я в классе (QR)", web_app=WebAppInfo(url=f"{config.public_url}/qr_universal"))],
-        [InlineKeyboardButton(text="Статистика", callback_data="stats")],
-        [InlineKeyboardButton(text="Помощь", callback_data="help")],
-    ])
+    [InlineKeyboardButton(text="Я в классе (QR)", url=f"{config.public_url}/scan")],
+    [InlineKeyboardButton(text="Статистика", callback_data="stats")],
+    [InlineKeyboardButton(text="Помощь", callback_data="help")],
+])
 
     await message.answer(
         f"Привет, {first_name}!\nТы зарегистрирован в системе посещаемости!",
@@ -74,11 +74,8 @@ async def start_polling():
 
 # ЭКСПОРТ ФУНКЦИИ
 __all__ = ["start_polling"]
-# ... (всё как раньше, но кнопка теперь с URL)
 
-kb = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Я в классе (QR)", url=f"{config.public_url}/scan")],
-    [InlineKeyboardButton(text="Статистика", callback_data="stats")],
-    [InlineKeyboardButton(text="Помощь", callback_data="help")],
-])
+
+
+
 
