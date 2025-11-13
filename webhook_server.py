@@ -3,66 +3,75 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from config import config
 from database_manager import database_manager
 from telegram_bot import bot
-from logging_config import logger
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "time": "November 13, 2025"}
+    return {"status": "ok"}
 
-# ОТДЕЛЬНЫЙ QR-СКАНЕР ПО ССЫЛКЕ (КАМЕРА РАБОТАЕТ НА 100%)
-@app.get("/scan")
-async def scan():
+# QR-СКАНЕР (Telegram WebApp)
+@app.get("/qr_universal")
+async def qr_universal():
     return HTMLResponse("""
     <!DOCTYPE html>
     <html>
     <head>
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>QR Посещаемость — Школа Рига</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
-            body {margin:0;background:#000;color:#0f0;text-align:center;font-family:sans-serif;}
-            video {width:100%;height:80vh;object-fit:cover;}
-            #status {font-size:1.5em;padding:15px;background:rgba(0,0,0,0.7);border-radius:15px;margin:20px;}
+            body {margin:0;background:#000;color:#0f0;text-align:center;padding:40px;font-family:sans-serif;}
+            h1 {font-size:2em;}
+            button {background:#0f0;color:#000;padding:18px 40px;font-size:1.5em;border:none;border-radius:15px;margin:20px;cursor:pointer;}
         </style>
     </head>
     <body>
-        <video id="video" autoplay playsinline></video>
-        <div id="status">Наведи на QR-код в классе...</div>
-        <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+        <h1>QR Посещаемость</h1>
+        <button onclick="scan()">СКАНИРОВАТЬ QR</button>
         <script>
-        navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
-        .then(stream => {
-            const video = document.getElementById('video');
-            video.srcObject = stream;
-            video.play();
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            setInterval(() => {
-                if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    ctx.drawImage(video, 0, 0);
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, canvas.width, canvas.height);
-                    if (code) {
-                        document.getElementById('status').innerText = 'Отметка принята!';
-                        fetch('/record?qr=' + encodeURIComponent(code.data))
-                        .then(() => setTimeout(() => location.reload(), 2000));
-                    }
-                }
-            }, 500);
-        }).catch(err => {
-            document.getElementById('status').innerText = 'Камера недоступна — разреши доступ в настройках';
+        function scan() {
+            Telegram.WebApp.showScanQrPopup({text: "Наведи на QR в классе"});
+        }
+
+        Telegram.WebApp.onEvent('qrTextReceived', function(event) {
+            const qr = event.data;
+            Telegram.WebApp.closeScanQrPopup();
+            fetch('/record?qr=' + encodeURIComponent(qr))
+            .then(() => {
+                Telegram.WebApp.showAlert('Отметка принята! Success');
+                setTimeout(() => Telegram.WebApp.close(), 1500);
+            });
         });
         </script>
     </body>
     </html>
     """)
 
-# ПРИЁМ ОТМЕТКИ ОТ СКАНЕРА
+# ПРИЁМ ОТМЕТКИ
 @app.get("/record")
-async def record(qr: str):
-    # Здесь можно добавить логику класса по QR
-    return JSONResponse({"status": "ok", "message": "Отметка принята!"})
+async def record(qr: str, request: Request):
+    init_data = request.headers.get("X-Telegram-WebApp-Init-Data")
+    if not init_data:
+        return JSONResponse({"status": "error"})
+
+    try:
+        import urllib.parse, json
+        params = dict(urllib.parse.parse_qsl(init_data))
+        user = json.loads(params.get("user", "{}"))
+        user_id = int(user["id"])
+        
+        database_manager.record_attendance(user_id, "QR")
+        
+        full_name = user.get("first_name", "Студент")
+        await bot.send_message(
+            config.telegram.admin_chat_id,
+            f"ВХОД\n{full_name}\n{datetime.now().strftime('%H:%M:%S')} | QR"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка: {e}")
+    
+    return JSONResponse({"status": "ok"})
