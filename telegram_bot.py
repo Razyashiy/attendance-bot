@@ -57,15 +57,9 @@ async def webapp_data(message: types.Message):
     full_name = f"{message.from_user.first_name} {message.from_user.last_name or ''}".strip()
     await bot.send_message(
         config.telegram.admin_chat_id,
-        f"ВХОД\n{full_name}\n{datetime.now().strftime('%d.%m %H:%M:%S')} | QR"
+        f"ВХОД\n{full_name}\n{datetime.now().strftime('%H:%M:%S')} | QR"
     )
     
     await message.answer("Отметка принята! Спасибо!")
-
-async def start_polling():
-    logger.info("Бот запущен в polling-режиме")
-    await dp.start_polling(bot)
-
-start_polling = start_polling  # Для импорта
 
 
