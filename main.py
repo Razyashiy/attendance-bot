@@ -1,15 +1,20 @@
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from webhook_server import app as webhook_app
-from telegram_bot import start_polling
+from telegram_bot import telegram_bot
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await telegram_bot.setup_webhook(webhook_url=f"{config.public_url}/webhook/telegram")
+    yield
+    # Shutdown
+    pass
+
+app = FastAPI(lifespan=lifespan)
 
 app.mount("/", webhook_app)
-
-@app.on_event("startup")
-async def startup():
-    asyncio.create_task(start_polling())
 
 if __name__ == "__main__":
     import uvicorn
