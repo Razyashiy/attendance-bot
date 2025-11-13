@@ -1,53 +1,68 @@
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import CommandStart
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram import F
 from database_manager import database_manager
 from logging_config import logger
 from config import config
 from datetime import datetime
-from typing import Dict
 
-class TelegramBot:
-    def __init__(self):
-        self.db = database_manager
-        logger.info("TelegramBot инициализирован")
+bot = Bot(token=config.telegram.bot_token)
+dp = Dispatcher()
 
-    async def process_message(self, user_id: int, text: str, user_data: dict) -> dict:
-        first_name = user_data.get("first_name", "Студент")
-        last_name = user_data.get("last_name", "")
-        full_name = f"{first_name} {last_name}".strip()
+@dp.message(CommandStart())
+async def start(message: types.Message):
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name or "Студент"
+    last_name = message.from_user.last_name or ""
 
-        # Регистрация при первом сообщении
-        if not self.db.get_student_by_telegram_id(user_id):
-            self.db.register_student(user_id, first_name, last_name)
+    # Регистрация
+    if not database_manager.get_student_by_telegram_id(user_id):
+        database_manager.register_student(user_id, first_name, last_name)
 
-        if text == "/start":
-            return {
-                "response": f"Привет, {full_name}!\n\nЯ в классе — отметка\nСтатистика — сколько пришло\nПомощь — инструкция",
-                "keyboard": [
-                    [{"text": "Я в классе (QR)", "web_app": {"url": f"{config.public_url}/qr_universal"}}],
-                    [{"text": "Статистика"}, {"text": "Помощь"}]
-                ]
-            }
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Я в классе (QR)", web_app=WebAppInfo(url=f"{config.public_url}/qr_universal"))],
+        [InlineKeyboardButton(text="Статистика", callback_data="stats")],
+        [InlineKeyboardButton(text="Помощь", callback_data="help")],
+    ])
 
-        if text == "Я в классе (QR)":
-            self.db.record_attendance(user_id, "QR")
-            await self._send_admin(f"ВХОД\n{full_name}\n{datetime.now().strftime('%H:%M:%S')} | QR")
-            return {"response": f"Отметка принята!\n{datetime.now().strftime('%H:%M:%S')}\nСпасибо, {first_name}!"}
+    await message.answer(
+        f"Привет, {first_name}!\nТы зарегистрирован в системе посещаемости!",
+        reply_markup=kb
+    )
 
-        if text == "Статистика":
-            stats = self.db.get_attendance_stats()
-            return {"response": f"Статистика:\nВсего: {stats['total_students']}\nСегодня: {stats['today_attendance']}"}
+@dp.callback_query(F.data == "stats")
+async def stats(call: types.CallbackQuery):
+    stats = database_manager.get_attendance_stats()
+    await call.message.edit_text(
+        f"Статистика:\nВсего студентов: {stats['total_students']}\nСегодня на уроке: {stats['today_attendance']}",
+        reply_markup=call.message.reply_markup
+    )
+    await call.answer()
 
-        if text == "Помощь":
-            return {"response": "Наведи камеру на QR в классе → отметка за 1 сек!\n\nКоманды:\n/start — главное меню\n/my — твоя посещаемость"}
+@dp.callback_query(F.data == "help")
+async def help_cmd(call: types.CallbackQuery):
+    await call.message.edit_text(
+        "Наведи камеру на QR в классе — отметка за 1 секунду!\n\n/start — главное меню",
+        reply_markup=call.message.reply_markup
+    )
+    await call.answer()
 
-        return {"response": "Нажми кнопку ниже или /start"}
+# Web App — запись посещения
+@dp.message(F.web_app_data)
+async def webapp_data(message: types.Message):
+    user_id = message.from_user.id
+    database_manager.record_attendance(user_id, "QR")
+    
+    # Уведомление админу
+    full_name = f"{message.from_user.first_name} {message.from_user.last_name or ''}".strip()
+    await bot.send_message(
+        config.telegram.admin_chat_id,
+        f"ВХОД\n{full_name}\n{datetime.now().strftime('%d.%m %H:%M:%S')} | QR"
+    )
+    
+    await message.answer("Отметка принята! Спасибо!")
 
-    async def _send_admin(self, text: str):
-        try:
-            import aiohttp
-            async with aiohttp.ClientSession() as session:
-                url = f"https://api.telegram.org/bot{config.telegram.bot_token}/sendMessage"
-                await session.post(url, json={"chat_id": config.telegram.admin_chat_id, "text": text})
-        except:
-            pass
-
-telegram_bot = TelegramBot()
+async def start_polling():
+    logger.info("Бот запущен в polling-режиме")
+    await dp.start_polling(bot)
