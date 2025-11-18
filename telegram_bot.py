@@ -1,74 +1,69 @@
-# telegram_bot.py — РАБОЧИЙ ССЫЛКА НА СКАНЕР (НЕ Mini App)
 
-import logging
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import F
 from datetime import datetime
+import logging
 
 from database_manager import database_manager
 from config import config
 
-logger = logging.getLogger(__name__)
-
+logging.basicConfig(level=logging.INFO)
 bot = Bot(token=config.telegram.bot_token)
 dp = Dispatcher()
 
-# ССЫЛКА НА ОТДЕЛЬНЫЙ СКАНЕР (КАМЕРА РАБОТАЕТ НА 100%)
-QR_SCANNER_URL = f"{config.public_url}/scan"
-
-def get_main_keyboard():
+def get_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Я в классе (QR)", url=QR_SCANNER_URL)],
+        [InlineKeyboardButton(
+            text="Я в классе — сканировать QR",
+            switch_inline_query_current_chat="CLASS_"   # ← нативный сканер Telegram
+        )],
         [InlineKeyboardButton(text="Статистика", callback_data="stats")],
-        [InlineKeyboardButton(text="Помощь", callback_data="help")],
     ])
 
 @dp.message(CommandStart())
-async def cmd_start(message: types.Message):
-    user = message.from_user
-    database_manager.register_student(
-        telegram_id=user.id,
-        first_name=user.first_name or "Ученик",
-        last_name=user.last_name or ""
-    )
+async def start(message: types.Message):
     await message.answer(
-        f"Привет, {user.first_name}!\n\n"
-        "Нажми кнопку ниже — откроется камера в браузере.\n"
-        "Наведи на QR-код в классе — отметка за 1 секунду!",
-        reply_markup=get_main_keyboard()
+        "Привет! Нажми кнопку ниже — откроется камера Telegram.\n"
+        "Наведи на QR-код в классе — и ты отмечен за полсекунды!",
+        reply_markup=get_keyboard()
+    )
+
+# Ловим результат нативного сканирования
+@dp.chosen_inline_result()
+async def qr_scanned(chosen: types.ChosenInlineResult):
+    qr_text = chosen.query.strip().upper()
+    user = chosen.from_user
+
+    database_manager.record_attendance(
+        telegram_id=user.id,
+        method="QR",
+        class_name=qr_text
+    )
+
+    # Админу
+    await bot.send_message(
+        config.telegram.admin_chat_id,
+        f"ВХОД\n"
+        f"{user.full_name}\n"
+        f"{datetime.now().strftime('%H:%M:%S')} | QR\n"
+        f"Класс: {qr_text}"
     )
 
 @dp.callback_query(F.data == "stats")
 async def stats(call: types.CallbackQuery):
-    stats = database_manager.get_attendance_stats()
+    s = database_manager.get_attendance_stats()
     await call.message.edit_text(
-        f"Статистика за сегодня:\n\n"
-        f"Учеников в системе: {stats.get('total_students', 0)}\n"
-        f"Отметились: {stats.get('today_attendance', 0)}\n"
-        f"Время: {datetime.now().strftime('%H:%M:%S')}",
-        reply_markup=get_main_keyboard()
+        f"Сегодня отметились: {s['today_attendance']}\n"
+        f"Всего учеников: {s['total_students']}",
+        reply_markup=get_keyboard()
     )
-    await call.answer()
 
-@dp.callback_query(F.data == "help")
-async def help_cmd(call: types.CallbackQuery):
-    await call.message.edit_text(
-        "Как пользоваться:\n\n"
-        "1. Нажми «Я в классе (QR)»\n"
-        "2. Разреши доступ к камере\n"
-        "3. Наведи на QR-код в классе\n"
-        "4. Готово — ты отмечен!\n\n"
-        "Работает на любом телефоне.",
-        reply_markup=get_main_keyboard()
-    )
-    await call.answer()
-
-async def start_bot():
-    logger.info("Бот запущен — ссылка на сканер готова")
+async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(start_bot())
+    asyncio.run(main())
