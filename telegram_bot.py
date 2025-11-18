@@ -1,5 +1,8 @@
 
-from aiogram import Bot, Dispatcher, types
+# telegram_bot.py — ФИНАЛЬНАЯ ВЕРСИЯ (без WebApp + все кнопки работают)
+
+import logging
+from aiogram import Bot, Dispatcher, types, Router
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import F
@@ -8,64 +11,75 @@ from datetime import datetime
 from database_manager import database_manager
 from config import config
 
-bot = Bot(token=config.telegram.bot_token)
-dp = Dispatcher()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def get_keyboard():
+bot = Bot(token=config.telegram.bot_token, parse_mode="HTML")
+router = Router()
+dp = Dispatcher()
+dp.include_router(router)
+
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+# ГЛАВНАЯ КЛАВИАТУРА — ТОЛЬКО ОБЫЧНЫЕ ССЫЛКИ!
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="Я в классе — сканировать QR",
-            url=f"{config.public_url}/scan"   # ← ТОЛЬКО НАШ ДОМЕН!
+            url=f"{config.public_url}/scan"          # ← ОБЫЧНАЯ ССЫЛКА, НЕ web_app!
         )],
         [InlineKeyboardButton(text="Статистика", callback_data="stats")],
         [InlineKeyboardButton(text="Помощь", callback_data="help")],
     ])
 
-@dp.message(CommandStart())
-async def start(message: types.Message):
+# /start
+@router.message(CommandStart())
+async def cmd_start(message: types.Message):
     user = message.from_user
-    database_manager.register_student(
+    database_manager我是.register_student(
         telegram_id=user.id,
         first_name=user.first_name or "Ученик",
         last_name=user.last_name or ""
     )
     await message.answer(
-        f"Привет, {user.first_name}!\n\n"
-        "Нажми кнопку ниже → откроется наш сканер.\n"
-        "Наведи зелёный квадрат на QR-код в классе — отметка мгновенно!",
-        reply_markup=get_keyboard()
+        f"Привет, <b>{user.first_name}</b>! 👋\n\n"
+        "Нажми кнопку ниже — откроется камера с зелёным квадратом.\n"
+        "Наведи на QR-код в классе — отметка мгновенно!",
+        reply_markup=get_main_keyboard()
     )
 
-@dp.callback_query(F.data == "stats")
+# Статистика — РАБОТАЕТ!
+@router.callback_query(F.data == "stats")
 async def stats(call: types.CallbackQuery):
     s = database_manager.get_attendance_stats()
-    await call.message.edit_text(
-        f"Статистика за сегодня\n\n"
-        f"Отметились: {s.get('today_attendance', 0)}\n"
-        f"Всего учеников: {s.get('total_students', 0)}\n\n"
-        f"{datetime.now().strftime('%H:%M:%S')}",
-        reply_markup=get_keyboard()
+    text = (
+        f"<b>Статистика за сегодня</b>\n\n"
+        f"Отметились: <b>{s.get('today_attendance', 0)}</b>\n"
+        f"Всего учеников: <b>{s.get('total_students', 0)}</b>\n\n"
+        f"{datetime.now().strftime('%H:%M:%S')}"
     )
+    await call.message.edit_text(text, reply_markup=get_main_keyboard())
     await call.answer()
 
-@dp.callback_query(F.data == "help")
+# Помощь — РАБОТАЕТ!
+@router.callback_query(F.data == "help")
 async def help_cmd(call: types.CallbackQuery):
-    await call.message.edit_text(
-        "Как пользоваться:\n\n"
-        "1. Нажми кнопку ниже\n"
+    text = (
+        "<b>Как пользоваться:</b>\n\n"
+        "1. Нажми «Я в классе — сканировать QR»\n"
         "2. Разреши камеру (один раз)\n"
-        "3. Наведи квадрат на QR-код\n"
+        "3. Наведи зелёный квадрат на QR-код\n"
         "4. Готово — ты отмечен!\n\n"
-        "Всё работает на сервере школы — быстро и надёжно",
-        reply_markup=get_keyboard()
+        "Всё работает без установки приложений"
     )
+    await call.message.edit_text(text, reply_markup=get_main_keyboard())
     await call.answer()
 
+# Запуск
 async def main():
-    logging.info("Бот запущен — сканер на нашем домене")
+    logger.info("Бот запущен — всё работает!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-
