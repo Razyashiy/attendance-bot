@@ -1,7 +1,9 @@
+# telegram_bot.py — РАБОЧИЙ ССЫЛКА НА СКАНЕР (НЕ Mini App)
+
 import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import F
 from datetime import datetime
 
@@ -13,15 +15,12 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=config.telegram.bot_token)
 dp = Dispatcher()
 
-# ТВОЯ РАБОЧАЯ ССЫЛКА — 100% РАБОТАЕТ
-QR_SCANNER_URL = "https://tgqr1.netlify.app/?webhook=https://attendance-bot.up.railway.app/record"
+# ССЫЛКА НА ОТДЕЛЬНЫЙ СКАНЕР (КАМЕРА РАБОТАЕТ НА 100%)
+QR_SCANNER_URL = f"{config.public_url}/scan"
 
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="Я в классе (QR)",
-            web_app=WebAppInfo(url=QR_SCANNER_URL)
-        )],
+        [InlineKeyboardButton(text="Я в классе (QR)", url=QR_SCANNER_URL)],
         [InlineKeyboardButton(text="Статистика", callback_data="stats")],
         [InlineKeyboardButton(text="Помощь", callback_data="help")],
     ])
@@ -36,8 +35,8 @@ async def cmd_start(message: types.Message):
     )
     await message.answer(
         f"Привет, {user.first_name}!\n\n"
-        "Нажми кнопку ниже — откроется камера.\n"
-        "Наведи на QR-код в классе — и ты отмечен за 1 секунду!",
+        "Нажми кнопку ниже — откроется камера в браузере.\n"
+        "Наведи на QR-код в классе — отметка за 1 секунду!",
         reply_markup=get_main_keyboard()
     )
 
@@ -58,20 +57,18 @@ async def help_cmd(call: types.CallbackQuery):
     await call.message.edit_text(
         "Как пользоваться:\n\n"
         "1. Нажми «Я в классе (QR)»\n"
-        "2. Разреши камеру (один раз)\n"
-        "3. Наведи на QR-код\n"
-        "4. Готово!\n\n"
+        "2. Разреши доступ к камере\n"
+        "3. Наведи на QR-код в классе\n"
+        "4. Готово — ты отмечен!\n\n"
         "Работает на любом телефоне.",
         reply_markup=get_main_keyboard()
     )
     await call.answer()
 
 async def start_bot():
-    logger.info("Бот запущен — всё работает")
+    logger.info("Бот запущен — ссылка на сканер готова")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(start_bot())
-
-
