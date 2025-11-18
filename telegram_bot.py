@@ -1,8 +1,4 @@
 
-
-# telegram_bot.py — ФИНАЛЬНАЯ ВЕРСИЯ
-
-import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -12,7 +8,6 @@ from datetime import datetime
 from database_manager import database_manager
 from config import config
 
-logging.basicConfig(level=logging.INFO)
 bot = Bot(token=config.telegram.bot_token)
 dp = Dispatcher()
 
@@ -20,7 +15,7 @@ def get_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="Я в классе — сканировать QR",
-            url=f"{config.public_url}/scan"      # ← обычная ссылка, НЕ web_app!
+            url=f"{config.public_url}/scan"   # ← ТОЛЬКО НАШ ДОМЕН!
         )],
         [InlineKeyboardButton(text="Статистика", callback_data="stats")],
         [InlineKeyboardButton(text="Помощь", callback_data="help")],
@@ -35,9 +30,9 @@ async def start(message: types.Message):
         last_name=user.last_name or ""
     )
     await message.answer(
-        "Привет, " + user.first_name + "!\n\n"
-        "Нажми кнопку ниже → откроется камера с квадратом.\n"
-        "Наведи квадрат на QR-код в классе — отметка за 1 секунду!",
+        f"Привет, {user.first_name}!\n\n"
+        "Нажми кнопку ниже → откроется наш сканер.\n"
+        "Наведи зелёный квадрат на QR-код в классе — отметка мгновенно!",
         reply_markup=get_keyboard()
     )
 
@@ -48,7 +43,7 @@ async def stats(call: types.CallbackQuery):
         f"Статистика за сегодня\n\n"
         f"Отметились: {s.get('today_attendance', 0)}\n"
         f"Всего учеников: {s.get('total_students', 0)}\n\n"
-        f"Время: {datetime.now().strftime('%H:%M:%S')}",
+        f"{datetime.now().strftime('%H:%M:%S')}",
         reply_markup=get_keyboard()
     )
     await call.answer()
@@ -57,17 +52,17 @@ async def stats(call: types.CallbackQuery):
 async def help_cmd(call: types.CallbackQuery):
     await call.message.edit_text(
         "Как пользоваться:\n\n"
-        "1. Нажми кнопку «Я в классе — сканировать QR»\n"
-        "2. Разреши доступ к камере (один раз)\n"
-        "3. Наведи зелёный квадрат на QR-код\n"
+        "1. Нажми кнопку ниже\n"
+        "2. Разреши камеру (один раз)\n"
+        "3. Наведи квадрат на QR-код\n"
         "4. Готово — ты отмечен!\n\n"
-        "Работает на любом телефоне",
+        "Всё работает на сервере школы — быстро и надёжно",
         reply_markup=get_keyboard()
     )
     await call.answer()
 
 async def main():
-    logging.info("Бот запущен — посредник готов")
+    logging.info("Бот запущен — сканер на нашем домене")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
