@@ -1,69 +1,69 @@
-import logging
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from aiogram import F
-
-from database_manager import database_manager
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from config import config
+from database_manager import database_manager
+from telegram_bot import bot
+from datetime import datetime
+import urllib.parse
+import json
+import logging
 
 logger = logging.getLogger(__name__)
 
-bot = Bot(token=config.telegram.bot_token)
-dp = Dispatcher()
+# ← ЭТОТ app — ГЛАВНЫЙ! ОБЯЗАТЕЛЬНО ДОЛЖЕН БЫТЬ!
+app = FastAPI()
 
-# ГЛАВНОЕ МЕНЮ — РАБОТАЕТ СРАЗУ
-def get_main_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="Я в классе (QR)",
-                web_app=WebAppInfo(url="https://russia-qr-school.netlify.app")
-            )
-        ],
-        [InlineKeyboardButton(text="Статистика", callback_data="stats")],
-        [InlineKeyboardButton(text="Помощь", callback_data="help")],
-    ])
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
-@dp.message(CommandStart())
-async def cmd_start(message: types.Message):
-    user = message.from_user
-    database_manager.register_student(
-        telegram_id=user.id,
-        first_name=user.first_name or "Ученик",
-        last_name=user.last_name or ""
-    )
+# Принимает и GET, и POST от сканера
+@app.post("/record")
+@app.get("/record")
+async def record_attendance(request: Request):
+    try:
+        # Получаем QR и данные пользователя
+        if request.method == "GET":
+            qr = request.query_params.get("qr")
+            init_data = request.headers.get("X-Telegram-WebApp-Init-Data", "")
+        else:
+            body = await request.json()
+            qr = body.get("qr")
+            init_data = body.get("initData", "")
 
-    await message.answer(
-        f"Привет, {user.first_name}!\n\n"
-        "Нажми кнопку ниже и отсканируй QR-код в классе — отметка придёт мгновенно!",
-        reply_markup=get_main_keyboard()
-    )
+        if not qr or not init_data:
+            return JSONResponse({"status": "error", "message": "no data"}, status_code=400)
 
-@dp.callback_query(F.data == "stats")
-async def stats(call: types.CallbackQuery):
-    stats = database_manager.get_attendance_stats()
-    await call.message.edit_text(
-        f"Статистика за сегодня:\n"
-        f"Всего учеников: {stats['total_students']}\n"
-        f"Отметились: {stats['today_attendance']}\n\n"
-        f"Последняя активность: {stats.get('last_entry', '—')}",
-        reply_markup=get_main_keyboard()
-    )
-    await call.answer()
+        # Расшифровка Telegram initData
+        params = dict(urllib.parse.parse_qsl(init_data))
+        user_data = json.loads(params.get("user", "{}"))
+        user_id = user_data.get("id")
+        first_name = user_data.get("first_name", "Ученик")
+        last_name = user_data.get("last_name", "")
 
-@dp.callback_query(F.data == "help")
-async def help_cmd(call: types.CallbackQuery):
-    await call.message.edit_text(
-        "Как пользоваться:\n\n"
-        "1. Нажми «Я в классе (QR)»\n"
-        "2. Наведи камеру на QR-код в классе\n"
-        "3. Готово! Ты отмечен\n\n"
-        "Всё работает без установки приложений!",
-        reply_markup=get_main_keyboard()
-    )
-    await call.answer()
+        if not user_id:
+            return JSONResponse({"status": "error", "message": "no user"}, status_code=400)
 
-async def start_bot():
-    logger.info("Запуск бота в режиме polling...")
-    await dp.start_polling(bot)
+        # Запись в БД
+        class_name = qr.strip().upper()
+        database_manager.record_attendance(
+            telegram_id=user_id,
+            method="QR",
+            class_name=class_name
+        )
+
+        # Уведомление админу
+        full_name = f"{first_name} {last_name}".strip() or "Ученик"
+        await bot.send_message(
+            chat_id=config.telegram.admin_chat_id,
+            text=f"ВХОД\n"
+                 f"{full_name}\n"
+                 f"{datetime.now().strftime('%H:%M:%S')} | QR\n"
+                 f"Класс: {class_name}"
+        )
+
+        return JSONResponse({"status": "ok"})
+
+    except Exception as e:
+        logger.error(f"Ошибка в /record: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
