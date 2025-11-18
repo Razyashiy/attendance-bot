@@ -1,77 +1,69 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from config import config
-from database_manager import database_manager
-from telegram_bot import bot
 import logging
-from datetime import datetime
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import CommandStart
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram import F
+
+from database_manager import database_manager
+from config import config
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+bot = Bot(token=config.telegram.bot_token)
+dp = Dispatcher()
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+# ГЛАВНОЕ МЕНЮ — РАБОТАЕТ СРАЗУ
+def get_main_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Я в классе (QR)",
+                web_app=WebAppInfo(url="https://russia-qr-school.netlify.app")
+            )
+        ],
+        [InlineKeyboardButton(text="Статистика", callback_data="stats")],
+        [InlineKeyboardButton(text="Помощь", callback_data="help")],
+    ])
 
-# QR-СКАНЕР (Telegram WebApp)
-@app.get("/qr_universal")
-async def qr_universal():
-    return HTMLResponse("""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
-        <style>
-            body {margin:0;background:#000;color:#0f0;text-align:center;padding:40px;font-family:sans-serif;}
-            h1 {font-size:2em;}
-            button {background:#0f0;color:#000;padding:18px 40px;font-size:1.5em;border:none;border-radius:15px;margin:20px;cursor:pointer;}
-        </style>
-    </head>
-    <body>
-        <h1>QR Посещаемость</h1>
-        <button onclick="scan()">СКАНИРОВАТЬ QR</button>
-        <script>
-        function scan() {
-            Telegram.WebApp.showScanQrPopup({text: "Наведи на QR в классе"});
-        }
+@dp.message(CommandStart())
+async def cmd_start(message: types.Message):
+    user = message.from_user
+    database_manager.register_student(
+        telegram_id=user.id,
+        first_name=user.first_name or "Ученик",
+        last_name=user.last_name or ""
+    )
 
-        Telegram.WebApp.onEvent('qrTextReceived', function(event) {
-            const qr = event.data;
-            Telegram.WebApp.closeScanQrPopup();
-            fetch('/record?qr=' + encodeURIComponent(qr))
-            .then(() => {
-                Telegram.WebApp.showAlert('Отметка принята! Success');
-                setTimeout(() => Telegram.WebApp.close(), 1500);
-            });
-        });
-        </script>
-    </body>
-    </html>
-    """)
+    await message.answer(
+        f"Привет, {user.first_name}!\n\n"
+        "Нажми кнопку ниже и отсканируй QR-код в классе — отметка придёт мгновенно!",
+        reply_markup=get_main_keyboard()
+    )
 
-# ПРИЁМ ОТМЕТКИ
-@app.get("/record")
-async def record(qr: str, request: Request):
-    init_data = request.headers.get("X-Telegram-WebApp-Init-Data")
-    if not init_data:
-        return JSONResponse({"status": "error"})
+@dp.callback_query(F.data == "stats")
+async def stats(call: types.CallbackQuery):
+    stats = database_manager.get_attendance_stats()
+    await call.message.edit_text(
+        f"Статистика за сегодня:\n"
+        f"Всего учеников: {stats['total_students']}\n"
+        f"Отметились: {stats['today_attendance']}\n\n"
+        f"Последняя активность: {stats.get('last_entry', '—')}",
+        reply_markup=get_main_keyboard()
+    )
+    await call.answer()
 
-    try:
-        import urllib.parse, json
-        params = dict(urllib.parse.parse_qsl(init_data))
-        user = json.loads(params.get("user", "{}"))
-        user_id = int(user["id"])
-        
-        database_manager.record_attendance(user_id, "QR")
-        
-        full_name = user.get("first_name", "Студент")
-        await bot.send_message(
-            config.telegram.admin_chat_id,
-            f"ВХОД\n{full_name}\n{datetime.now().strftime('%H:%M:%S')} | QR"
-        )
-    except Exception as e:
-        logger.error(f"Ошибка: {e}")
-    
-    return JSONResponse({"status": "ok"})
+@dp.callback_query(F.data == "help")
+async def help_cmd(call: types.CallbackQuery):
+    await call.message.edit_text(
+        "Как пользоваться:\n\n"
+        "1. Нажми «Я в классе (QR)»\n"
+        "2. Наведи камеру на QR-код в классе\n"
+        "3. Готово! Ты отмечен\n\n"
+        "Всё работает без установки приложений!",
+        reply_markup=get_main_keyboard()
+    )
+    await call.answer()
+
+async def start_bot():
+    logger.info("Запуск бота в режиме polling...")
+    await dp.start_polling(bot)
