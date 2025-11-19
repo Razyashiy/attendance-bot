@@ -1,8 +1,10 @@
+# telegram_bot.py — СТРЕЛОЧКА КАК В ТОМ РАБОЧЕМ БОТЕ (БЕЗ Mini App!)
+
 import logging
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram import F
 
 from database_manager import database_manager
@@ -16,16 +18,6 @@ router = Router()
 dp = Dispatcher()
 dp.include_router(router)
 
-def get_main_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="Я в классе — сканировать QR",
-            url="https://qr.school2025.ru"   # ← РАБОТАЕТ В БРАУЗЕРЕ У ЧИСТОГО БОТА!
-        )],
-        [InlineKeyboardButton(text="Статистика", callback_data="stats")],
-        [InlineKeyboardButton(text="Помощь", callback_data="help")],
-    ])
-
 @router.message(CommandStart())
 async def start(message: types.Message):
     user = message.from_user
@@ -34,11 +26,29 @@ async def start(message: types.Message):
         first_name=user.first_name or "Ученик",
         last_name=user.last_name or ""
     )
+    
     await message.answer(
         f"Привет, <b>{user.first_name}</b>!\n\n"
-        "Нажми кнопку ниже — откроется камера в браузере.\n"
-        "Наведи квадрат на QR-код — отметка мгновенно!",
-        reply_markup=get_main_keyboard()
+        "Нажми кнопку ниже — откроется сканер с зелёным квадратом:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Я в классе — сканировать QR",
+                callback_data="open_scanner"   # ← СТРЕЛОЧКА!
+            )],
+            [InlineKeyboardButton(text="Статистика", callback_data="stats")],
+            [InlineKeyboardButton(text="Помощь", callback_data="help")],
+        ])
+    )
+
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+# ВОТ ОНА — СТРЕЛОЧКА ИЗ ПРОШЛОГО БОТА!
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+@router.callback_query(F.data == "open_scanner")
+async def open_scanner(call: types.CallbackQuery):
+    await call.message.answer()
+    await bot.answer_callback_query(
+        call.id,
+        url="https://qr.school2025.ru"
     )
 
 @router.callback_query(F.data == "stats")
@@ -49,7 +59,7 @@ async def stats(call: types.CallbackQuery):
         f"Отметились: <b>{s.get('today_attendance', 0)}</b>\n"
         f"Всего учеников: <b>{s.get('total_students', 0)}</b>\n\n"
         f"{datetime.now().strftime('%H:%M:%S')}",
-        reply_markup=get_main_keyboard()
+        reply_markup=call.message.reply_markup
     )
     await call.answer()
 
@@ -58,21 +68,18 @@ async def help_cmd(call: types.CallbackQuery):
     await call.message.edit_text(
         "<b>Как пользоваться</b>\n\n"
         "1. Нажми кнопку «Я в классе — сканировать QR»\n"
-        "2. Разреши камеру (один раз)\n"
-        "3. Наведи зелёный квадрат на QR-код\n"
-        "4. Готово!\n\n"
-        "Работает на любом телефоне",
-        reply_markup=get_main_keyboard()
+        "2. Разреши камеру\n"
+        "3. Наведи квадрат на QR-код\n"
+        "4. Готово!",
+        reply_markup=call.message.reply_markup
     )
     await call.answer()
 
 async def main():
-    logger.info("Бот запущен — всё работает")
+    logger.info("Бот запущен — стрелочка как в прошлом боте")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-
-
 
