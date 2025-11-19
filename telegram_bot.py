@@ -1,9 +1,9 @@
 import logging
+from datetime import datetime                     # ← ДОБАВИЛ!
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import F
-from datetime import datetime
 
 from database_manager import database_manager
 from config import config
@@ -15,12 +15,11 @@ router = Router()
 dp = Dispatcher()
 dp.include_router(router)
 
-# ГЛАВНАЯ КЛАВИАТУРА — КНОПКА ОТКРЫВАЕТ БРАУЗЕР!
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="Я в классе — сканировать QR",
-            url=f"{config.public_url}/scan"    # ← ОБЫЧНАЯ ССЫЛКА = БРАУЗЕР!
+            url=f"{config.public_url}/scan"      # ← ОТКРЫВАЕТ БРАУЗЕР!
         )],
         [InlineKeyboardButton(text="Статистика", callback_data="stats")],
         [InlineKeyboardButton(text="Помощь", callback_data="help")],
@@ -47,7 +46,8 @@ async def stats(call: types.CallbackQuery):
     await call.message.edit_text(
         f"<b>Статистика за сегодня</b>\n\n"
         f"Отметились: <b>{s.get('today_attendance', 0)}</b>\n"
-        f"Всего учеников: <b>{s.get('total_students', 0)}</b>",
+        f"Всего учеников: <b>{s.get('total_students', 0)}</b>\n\n"
+        f"<i>{datetime.now().strftime('%H:%M:%S')}</i>",
         reply_markup=get_main_keyboard()
     )
     await call.answer()
@@ -56,10 +56,11 @@ async def stats(call: types.CallbackQuery):
 async def help_cmd(call: types.CallbackQuery):
     await call.message.edit_text(
         "<b>Как пользоваться</b>\n\n"
-        "1. Нажми кнопку «Я в классе — сканировать QR»\n"
+        "1. Нажми «Я в классе — сканировать QR»\n"
         "2. Разреши камеру (один раз)\n"
         "3. Наведи зелёный квадрат на QR-код\n"
-        "4. Готово!",
+        "4. Готово!\n\n"
+        "Работает на любом телефоне",
         reply_markup=get_main_keyboard()
     )
     await call.answer()
