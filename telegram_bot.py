@@ -18,9 +18,9 @@ dp.include_router(router)
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text="Я в классе — сканировать QR",
-            url="https://schoolqr.ru/scan"     # ← ОТКРЫВАЕТ БРАУЗЕР!
-        )],
+    text="Я в классе — сканировать QR",
+    url="https://qr.school2025.ru"      # ← 100% чистый домен, без кэша
+)],
         [InlineKeyboardButton(text="Статистика", callback_data="stats")],
         [InlineKeyboardButton(text="Помощь", callback_data="help")],
     ])
@@ -71,4 +71,5 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
