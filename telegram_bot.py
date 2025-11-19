@@ -16,12 +16,11 @@ router = Router()
 dp = Dispatcher()
 dp.include_router(router)
 
-# КНОПКА ОТКРЫВАЕТ БРАУЗЕР (НЕ Mini App!)
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="Я в классе — сканировать QR",
-            url="https://qr.school2025.ru"  # ← чистый сканер, без WebApp
+            url="https://qr.school2025.ru"   # ← РАБОТАЕТ В БРАУЗЕРЕ У ЧИСТОГО БОТА!
         )],
         [InlineKeyboardButton(text="Статистика", callback_data="stats")],
         [InlineKeyboardButton(text="Помощь", callback_data="help")],
@@ -74,5 +73,6 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
