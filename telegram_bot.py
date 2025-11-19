@@ -33,13 +33,16 @@ async def start(message: types.Message):
         first_name=user.first_name or "Ученик",
         last_name=user.last_name or ""
     )
+    
+    scan_url = "https://qr.school2025.ru"   # ← чистый домен
+    
     await message.answer(
         f"Привет, <b>{user.first_name}</b>!\n\n"
-        "Нажми кнопку ниже — откроется сканер в браузере.\n"
-        "Наведи квадрат на QR-код — отметка мгновенно!",
-        reply_markup=get_main_keyboard()
+        "Отметиться на уроке — просто нажми на эту ссылку:\n\n"
+        f"<b><a href='{scan_url}'>Открыть сканер QR</a></b>\n\n"
+        "Наведи квадрат на код в классе — и всё!",
+        disable_web_page_preview=True
     )
-
 @router.callback_query(F.data == "stats")
 async def stats(call: types.CallbackQuery):
     s = database_manager.get_attendance_stats()
@@ -71,5 +74,6 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
