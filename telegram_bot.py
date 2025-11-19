@@ -19,7 +19,7 @@ def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="Я в классе — сканировать QR",
-            url=f"{config.public_url}/scan"      # ← ОТКРЫВАЕТ БРАУЗЕР!
+            url="https://schoolqr.ru/scan"     # ← ОТКРЫВАЕТ БРАУЗЕР!
         )],
         [InlineKeyboardButton(text="Статистика", callback_data="stats")],
         [InlineKeyboardButton(text="Помощь", callback_data="help")],
@@ -71,3 +71,4 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
