@@ -24,12 +24,10 @@ dp.include_router(router)
 # ГЛАВНАЯ КЛАВИАТУРА — ТОЛЬКО ОБЫЧНЫЕ ССЫЛКИ!
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="Я в классе — сканировать QR",
-                url=f"{config.public_url}/scan"   # ← ОБЫЧНАЯ ССЫЛКА, НЕ web_app!
-            )
-        ],
+        [InlineKeyboardButton(
+            text="Я в классе — сканировать QR",
+            url=f"{config.public_url}/scan"   # ← ЭТО ОБЫЧНАЯ ССЫЛКА!
+        )],
         [InlineKeyboardButton(text="Статистика", callback_data="show_stats")],
         [InlineKeyboardButton(text="Помощь", callback_data="show_help")],
     ])
@@ -92,3 +90,4 @@ async def start_bot():
 # Запуск (если запускаешь локально)
 if __name__ == "__main__":
     asyncio.run(start_bot())
+
